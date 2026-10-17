@@ -1,0 +1,189 @@
+
+-- Nanahhb Super Ring | Golden Diagnostic
+-- Client-side diagnostics for Delta Android
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local enabled = false
+local radius = 10
+local spinSpeed = 2
+local connection
+local gui
+
+-- Xoa GUI cu neu chay lai script
+pcall(function()
+    local old = player.PlayerGui:FindFirstChild("NanahhbSuperRing")
+    if old then old:Destroy() end
+end)
+
+gui = Instance.new("ScreenGui")
+gui.Name = "NanahhbSuperRing"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.fromOffset(270, 280)
+main.Position = UDim2.new(0.5, -135, 0.5, -140)
+main.BackgroundColor3 = Color3.fromRGB(255, 248, 228)
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+
+Instance.new("UICorner", main).CornerRadius =
+    UDim.new(0, 14)
+
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(235, 190, 80)
+stroke.Thickness = 2
+
+local function label(text, y, height, size)
+    local obj = Instance.new("TextLabel")
+    obj.Size = UDim2.new(1, -20, 0, height)
+    obj.Position = UDim2.fromOffset(10, y)
+    obj.BackgroundTransparency = 1
+    obj.Text = text
+    obj.TextColor3 = Color3.fromRGB(112, 78, 28)
+    obj.Font = Enum.Font.GothamBold
+    obj.TextSize = size
+    obj.Parent = main
+    return obj
+end
+
+label("SUPER RING", 7, 30, 21)
+label("by Nanahhb", 35, 20, 13)
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(1, -24, 0, 35)
+toggle.Position = UDim2.fromOffset(12, 61)
+toggle.BackgroundColor3 = Color3.fromRGB(239, 205, 120)
+toggle.TextColor3 = Color3.fromRGB(100, 68, 20)
+toggle.Text = "RING: OFF"
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 15
+toggle.Parent = main
+Instance.new("UICorner", toggle).CornerRadius =
+    UDim.new(0, 8)
+
+label("Radius (2 - 100)", 100, 20, 13)
+
+local radiusBox = Instance.new("TextBox")
+radiusBox.Size = UDim2.new(1, -24, 0, 30)
+radiusBox.Position = UDim2.fromOffset(12, 121)
+radiusBox.BackgroundColor3 = Color3.fromRGB(255, 239, 199)
+radiusBox.TextColor3 = Color3.fromRGB(100, 68, 20)
+radiusBox.Text = "10"
+radiusBox.ClearTextOnFocus = false
+radiusBox.Font = Enum.Font.Gotham
+radiusBox.TextSize = 14
+radiusBox.Parent = main
+Instance.new("UICorner", radiusBox).CornerRadius =
+    UDim.new(0, 8)
+
+label("Rotation speed (0.1 - 10)", 155, 20, 13)
+
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1, -24, 0, 30)
+speedBox.Position = UDim2.fromOffset(12, 176)
+speedBox.BackgroundColor3 = Color3.fromRGB(255, 239, 199)
+speedBox.TextColor3 = Color3.fromRGB(100, 68, 20)
+speedBox.Text = "2"
+speedBox.ClearTextOnFocus = false
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextSize = 14
+speedBox.Parent = main
+Instance.new("UICorner", speedBox).CornerRadius =
+    UDim.new(0, 8)
+
+local status = label("STATUS: Ready", 212, 22, 12)
+status.TextWrapped = true
+
+local details = label("Parts found: 0", 236, 22, 12)
+
+local function stopCheck()
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+end
+
+local function refreshDiagnostics()
+    local character = player.Character
+    local root = character and
+        character:FindFirstChild("HumanoidRootPart")
+
+    local count = 0
+    local nearby = 0
+
+    -- Chi thong ke, khong thay doi vat the
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            count += 1
+
+            if root and (obj.Position - root.Position).Magnitude <= radius then
+                nearby += 1
+            end
+        end
+    end
+
+    details.Text = "Parts: " .. count ..
+        " | Nearby: " .. nearby
+
+    if not root then
+        status.Text = "STATUS: Character not ready"
+    elseif count == 0 then
+        status.Text = "STATUS: No Parts found"
+    elseif nearby == 0 then
+        status.Text = "STATUS: No Parts in radius"
+    else
+        status.Text = "STATUS: Parts detected"
+    end
+end
+
+radiusBox.FocusLost:Connect(function()
+    radius = math.clamp(tonumber(radiusBox.Text) or 10, 2, 100)
+    radiusBox.Text = tostring(radius)
+    if enabled then refreshDiagnostics() end
+end)
+
+speedBox.FocusLost:Connect(function()
+    spinSpeed = math.clamp(tonumber(speedBox.Text) or 2, 0.1, 10)
+    speedBox.Text = tostring(spinSpeed)
+end)
+
+toggle.Activated:Connect(function()
+    enabled = not enabled
+
+    if enabled then
+        toggle.Text = "RING: ON"
+        status.Text = "STATUS: Checking..."
+        stopCheck()
+
+        connection = RunService.Heartbeat:Connect(function()
+            -- Cap nhat thong ke theo chu ky, tranh quet moi frame
+            if not gui.Parent then
+                stopCheck()
+                return
+            end
+        end)
+
+        task.spawn(function()
+            while enabled and gui.Parent do
+                refreshDiagnostics()
+                task.wait(2)
+            end
+        end)
+    else
+        toggle.Text = "RING: OFF"
+        status.Text = "STATUS: Paused"
+        stopCheck()
+    end
+end)
+
+gui.Destroying:Connect(function()
+    enabled = false
+    stopCheck()
+end)
+
+print("[Nanahhb] Diagnostic GUI loaded")
